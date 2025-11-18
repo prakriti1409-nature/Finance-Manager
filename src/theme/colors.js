@@ -1,0 +1,16 @@
+export const COLORS = {
+  background: '#0a0a0a',
+  surface: '#1a1a1a',
+  surfaceLight: '#252525',
+  primary: '#00D4FF',
+  primaryDark: '#00A8CC',
+  success: '#10B981',
+  error: '#EF4444',
+  warning: '#F59E0B',
+  text: '#FFFFFF',
+  textSecondary: '#A0A0A0',
+  border: '#2a2a2a',
+  gradient1: ['#00D4FF', '#0099FF', '#0066FF'],
+  gradient2: ['#8B5CF6', '#6366F1', '#3B82F6'],
+  gradient3: ['#10B981', '#059669', '#047857'],
+};
