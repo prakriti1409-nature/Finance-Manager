@@ -3,7 +3,8 @@ import { View, StyleSheet, Alert, TouchableOpacity, KeyboardAvoidingView, Platfo
 import { Text, TextInput } from 'react-native-paper';
 import Animated, { FadeInDown, useAnimatedStyle, useSharedValue, withSpring, withSequence } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
-import api from '../api/mockApi';
+import api from '../api/axios';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useDispatch } from 'react-redux';
 import { setCredentials } from '../store/store';
 import { COLORS } from '../theme/colors';
@@ -20,9 +21,16 @@ export default function LoginScreen({ navigation }) {
     setLoading(true);
     try {
       const res = await api.post('token/', { username, password });
-      const token = res.data.access;
-      dispatch(setCredentials({ user: username, token }));
-      navigation.replace('Dashboard');
+      console.log("LOGIN RESPONSE:", res.data);
+      const token = res.data.access || res.data.access_token || res.data.token || null;
+      console.log("SAVING TOKEN:", token);
+      if (!token) throw new Error('No access token returned');
+      await AsyncStorage.setItem('access_token', token);
+await AsyncStorage.flushGetRequests();  
+dispatch(setCredentials({ user: username, token }));
+setTimeout(() => {
+  navigation.replace('Dashboard');
+}, 100);   
     } catch (e) {
       shakeAnim.value = withSequence(
         withSpring(-10),

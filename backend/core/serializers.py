@@ -3,18 +3,46 @@ from rest_framework import serializers
 from django.contrib.auth.models import User
 from .models import Transaction
 from .utils import encrypt_data, decrypt_data
-from .models import Transaction, ChatMessage, Category, Budget, Goal
+from .models import Transaction, ChatMessage, Category, Budget, Goal,Expense,Income
+from django.contrib.auth.hashers import make_password
 
 
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ['id', 'username', 'password']
-        extra_kwargs = {'password': {'write_only': True}}
+        fields = ["id", "username", "email", "first_name", "last_name"]
+
+
+class RegisterSerializer(serializers.ModelSerializer):
+    password = serializers.CharField(write_only=True, required=True, min_length=6, style={"input_type":"password"})
+    confirm_password = serializers.CharField(write_only=True, required=True, min_length=6, style={"input_type":"password"})
+
+    class Meta:
+        model = User
+        fields = [
+            "username",
+            "email",
+            "password",
+            "confirm_password",
+            "first_name",
+            "last_name",
+        ]
+
+    def validate_email(self, value):
+        if User.objects.filter(email=value).exists():
+            raise serializers.ValidationError("Email already registered.")
+        return value
+
+    def validate(self, data):
+        if data["password"] != data["confirm_password"]:
+            raise serializers.ValidationError({"password": "Passwords do not match."})
+        return data
 
     def create(self, validated_data):
-        user = User.objects.create_user(**validated_data)
-        return user
+        validated_data.pop("confirm_password")
+        validated_data["password"] = make_password(validated_data["password"])
+        return User.objects.create(**validated_data)
+
 
 class TransactionSerializer(serializers.ModelSerializer):
     description = serializers.CharField(allow_blank=True, required=False)
@@ -64,3 +92,42 @@ class GoalSerializer(serializers.ModelSerializer):
         model = Goal
         fields = "__all__"
         read_only_fields = ["user"]
+        
+class ExpenseSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Expense
+        fields = [
+            "id",
+            "user",
+            "amount",
+            "category",
+            "date",
+            "note",
+            "created_at",
+        ]
+        read_only_fields = ["id", "created_at", "user"]
+
+class GoalSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Goal
+        fields = [
+            "id",
+            "title",
+            "target_amount",
+            "deadline",
+            "note",
+            "created_at",
+        ]
+        read_only_fields = ["id", "created_at"]
+class IncomeSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Income
+        fields = [
+            "id",
+            "amount",
+            "source",
+            "date",
+            "note",
+            "created_at",
+        ]
+        read_only_fields = ["id", "created_at"]

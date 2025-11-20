@@ -10,34 +10,32 @@ def generate_advice(status):
     else:
         return "Reassess your budget. Consider cutting non-essential expenses."
 
-def calculate_financial_score(income, expenses, savings=0, debt=0):
+def calculate_financial_score(income, expenses):
     try:
-        income = float(income) if income is not None else 0.0
-        expenses = float(expenses) if expenses is not None else 0.0
-        if income <= 0:
-            saving_rate = 0
-            debt_ratio = 1 if debt > 0 else 0
-        else:
-            saving_rate = max(0.0, (income - expenses) / income)
-            debt_ratio = min(1.0, debt / income) if debt > 0 else 0.0
+        income = float(income)
+        expenses = float(expenses)
 
-        score_raw = (saving_rate * 0.7) - (debt_ratio * 0.3)
-        score = max(0.0, min(1.0, score_raw))
-        score_percent = round(score * 100, 2)
+        if income <= 0 and expenses <= 0:
+            return {"financial_score": 0, "status": "Poor", "advice": "Add income and expenses data."}
 
-        if score_percent >= 80:
+        score = 100 * (1 - (expenses / (income + expenses)))
+        score = round(max(0, min(100, score)), 2)
+
+        if score >= 80:
             status = "Excellent"
-        elif score_percent >= 60:
+        elif score >= 60:
             status = "Good"
-        elif score_percent >= 40:
+        elif score >= 40:
             status = "Average"
         else:
             status = "Poor"
 
         return {
-            "financial_score": score_percent,
+            "financial_score": score,
             "status": status,
             "advice": generate_advice(status)
         }
+
     except Exception as e:
         return {"financial_score": 0, "status": "Error", "advice": str(e)}
+

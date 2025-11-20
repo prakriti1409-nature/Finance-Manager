@@ -3,7 +3,7 @@ import { View, StyleSheet, KeyboardAvoidingView, Platform, Alert, TouchableOpaci
 import { Text, TextInput } from 'react-native-paper';
 import Animated, { FadeInDown, useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
-import api from '../api/mockApi';
+import api from '../api/axios';
 import { COLORS } from '../theme/colors';
 
 export default function AddTransactionScreen({ navigation }) {
@@ -32,11 +32,11 @@ export default function AddTransactionScreen({ navigation }) {
     
     setLoading(true);
     try {
-      await api.post('transactions/', {
-        category,
-        amount: parseFloat(amount),
-        description: description.trim(),
-      });
+      if (category === 'expense') {
+        await api.post('expenses/', { amount: parseFloat(amount), category, date: new Date().toISOString().split('T')[0], note: description.trim() });
+      } else {
+        await api.post('income/', { amount: parseFloat(amount), source: description.trim(), date: new Date().toISOString().split('T')[0], note: '' });
+      }
       Alert.alert('Success! ✨', 'Transaction added successfully');
       navigation.goBack();
     } catch (e) {

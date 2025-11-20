@@ -1,13 +1,24 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { View, StyleSheet, ScrollView, KeyboardAvoidingView, Platform, TouchableOpacity } from 'react-native';
-import { Text, TextInput } from 'react-native-paper';
-import Animated, { FadeInRight, FadeInLeft, Layout } from 'react-native-reanimated';
-import { LinearGradient } from 'expo-linear-gradient';
-import api from '../api/mockApi';
-import { COLORS } from '../theme/colors';
+import React, { useState, useRef, useEffect } from "react";
+import {
+  View,
+  StyleSheet,
+  ScrollView,
+  KeyboardAvoidingView,
+  Platform,
+  TouchableOpacity,
+} from "react-native";
+import { Text, TextInput } from "react-native-paper";
+import Animated, {
+  FadeInRight,
+  FadeInLeft,
+  Layout,
+} from "react-native-reanimated";
+import { LinearGradient } from "expo-linear-gradient";
+import api from "../api/axios";
+import { COLORS } from "../theme/colors";
 
 export default function ChatbotScreen() {
-  const [query, setQuery] = useState('');
+  const [query, setQuery] = useState("");
   const [chat, setChat] = useState([]);
   const [loading, setLoading] = useState(false);
   const scrollViewRef = useRef(null);
@@ -16,19 +27,43 @@ export default function ChatbotScreen() {
     scrollViewRef.current?.scrollToEnd({ animated: true });
   }, [chat]);
 
+  // const ask = async () => {
+  //   if (!query.trim()) return;
+
+  //   const userMessage = { from: 'user', text: query };
+  //   setChat(prev => [...prev, userMessage]);
+  //   setQuery('');
+  //   setLoading(true);
+
+  //   try {
+  //     const res = await api.post('chatbot/', { question: query });
+  //     setChat(prev => [...prev, { from: 'bot', text: res.data.reply }]);
+  //   } catch (e) {
+  //     setChat(prev => [...prev, { from: 'bot', text: 'Sorry, I encountered an error. Please try again.' }]);
+  //   } finally {
+  //     setLoading(false);
+  //   }
+  // };
   const ask = async () => {
     if (!query.trim()) return;
-    
-    const userMessage = { from: 'user', text: query };
-    setChat(prev => [...prev, userMessage]);
-    setQuery('');
+
+    const userMessage = { from: "user", text: query };
+    setChat((prev) => [...prev, userMessage]);
+    setQuery("");
     setLoading(true);
 
     try {
-      const res = await api.post('chatbot/', { question: query });
-      setChat(prev => [...prev, { from: 'bot', text: res.data.answer }]);
+      const res = await api.post("chatbot/llm/", {
+        message: query,
+      });
+
+      setChat((prev) => [...prev, { from: "bot", text: res.data.reply }]);
     } catch (e) {
-      setChat(prev => [...prev, { from: 'bot', text: 'Sorry, I encountered an error. Please try again.' }]);
+      console.log(e);
+      setChat((prev) => [
+        ...prev,
+        { from: "bot", text: "Sorry, I encountered an error." },
+      ]);
     } finally {
       setLoading(false);
     }
@@ -43,7 +78,10 @@ export default function ChatbotScreen() {
   );
 
   return (
-    <KeyboardAvoidingView style={styles.chatContainer} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <KeyboardAvoidingView
+      style={styles.chatContainer}
+      behavior={Platform.OS === "ios" ? "padding" : undefined}
+    >
       {/* Header */}
       <LinearGradient colors={COLORS.gradient2} style={styles.chatHeader}>
         <View style={styles.botAvatar}>
@@ -51,38 +89,53 @@ export default function ChatbotScreen() {
         </View>
         <View>
           <Text style={styles.chatHeaderTitle}>Financial AI Assistant</Text>
-          <Text style={styles.chatHeaderSubtitle}>Ask me anything about your finances</Text>
+          <Text style={styles.chatHeaderSubtitle}>
+            Ask me anything about your finances
+          </Text>
         </View>
       </LinearGradient>
 
       {/* Chat Messages */}
-      <ScrollView 
+      <ScrollView
         ref={scrollViewRef}
-        style={styles.chatBox} 
+        style={styles.chatBox}
         contentContainerStyle={styles.chatBoxContent}
         showsVerticalScrollIndicator={false}
       >
         {chat.length === 0 && (
           <View style={styles.emptyChat}>
             <Text style={styles.emptyChatTitle}>👋 Hi there!</Text>
-            <Text style={styles.emptyChatText}>I'm your AI financial advisor. Try asking:</Text>
+            <Text style={styles.emptyChatText}>
+              I'm your AI financial advisor. Try asking:
+            </Text>
             <SuggestedQuestion text="How am I doing financially?" />
             <SuggestedQuestion text="What should I save this month?" />
             <SuggestedQuestion text="Analyze my spending patterns" />
           </View>
         )}
 
-        {chat.map((m, i) => (
-          m.from === 'user' ? (
-            <Animated.View key={i} entering={FadeInRight.springify()} layout={Layout.springify()}>
+        {chat.map((m, i) =>
+          m.from === "user" ? (
+            <Animated.View
+              key={i}
+              entering={FadeInRight.springify()}
+              layout={Layout.springify()}
+            >
               <View style={styles.userMsgContainer}>
-                <LinearGradient colors={COLORS.gradient1} style={styles.userMsg}>
+                <LinearGradient
+                  colors={COLORS.gradient1}
+                  style={styles.userMsg}
+                >
                   <Text style={styles.userMsgText}>{m.text}</Text>
                 </LinearGradient>
               </View>
             </Animated.View>
           ) : (
-            <Animated.View key={i} entering={FadeInLeft.springify()} layout={Layout.springify()}>
+            <Animated.View
+              key={i}
+              entering={FadeInLeft.springify()}
+              layout={Layout.springify()}
+            >
               <View style={styles.botMsgContainer}>
                 <View style={styles.botMsgAvatar}>
                   <Text style={styles.botMsgAvatarText}>🤖</Text>
@@ -93,7 +146,7 @@ export default function ChatbotScreen() {
               </View>
             </Animated.View>
           )
-        ))}
+        )}
 
         {loading && (
           <Animated.View entering={FadeInLeft.springify()}>
@@ -124,13 +177,19 @@ export default function ChatbotScreen() {
           mode="flat"
           underlineColor="transparent"
           activeUnderlineColor="transparent"
-          theme={{ colors: { text: COLORS.text, placeholder: COLORS.textSecondary } }}
+          theme={{
+            colors: { text: COLORS.text, placeholder: COLORS.textSecondary },
+          }}
           multiline
           maxLength={500}
         />
         <TouchableOpacity onPress={ask} disabled={loading || !query.trim()}>
-          <LinearGradient 
-            colors={query.trim() ? COLORS.gradient1 : [COLORS.surfaceLight, COLORS.surfaceLight]} 
+          <LinearGradient
+            colors={
+              query.trim()
+                ? COLORS.gradient1
+                : [COLORS.surfaceLight, COLORS.surfaceLight]
+            }
             style={styles.sendButton}
           >
             <Text style={styles.sendButtonText}>➤</Text>
@@ -147,8 +206,8 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.background,
   },
   chatHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     padding: 20,
     paddingTop: 60,
     paddingBottom: 24,
@@ -157,9 +216,9 @@ const styles = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    justifyContent: 'center',
-    alignItems: 'center',
+    backgroundColor: "rgba(255,255,255,0.2)",
+    justifyContent: "center",
+    alignItems: "center",
     marginRight: 16,
   },
   botAvatarText: {
@@ -168,10 +227,10 @@ const styles = StyleSheet.create({
   chatHeaderTitle: {
     color: COLORS.text,
     fontSize: 20,
-    fontWeight: 'bold',
+    fontWeight: "bold",
   },
   chatHeaderSubtitle: {
-    color: 'rgba(255,255,255,0.8)',
+    color: "rgba(255,255,255,0.8)",
     fontSize: 14,
   },
   chatBox: {
@@ -181,7 +240,7 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   emptyChat: {
-    alignItems: 'center',
+    alignItems: "center",
     paddingTop: 40,
   },
   emptyChatTitle: {
@@ -207,11 +266,11 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   userMsgContainer: {
-    alignItems: 'flex-end',
+    alignItems: "flex-end",
     marginBottom: 16,
   },
   userMsg: {
-    maxWidth: '80%',
+    maxWidth: "80%",
     padding: 16,
     borderRadius: 20,
     borderBottomRightRadius: 4,
@@ -223,8 +282,8 @@ const styles = StyleSheet.create({
     lineHeight: 22,
   },
   botMsgContainer: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
+    flexDirection: "row",
+    alignItems: "flex-start",
     marginBottom: 16,
   },
   botMsgAvatar: {
@@ -232,15 +291,15 @@ const styles = StyleSheet.create({
     height: 36,
     borderRadius: 18,
     backgroundColor: COLORS.surface,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     marginRight: 12,
   },
   botMsgAvatarText: {
     fontSize: 20,
   },
   botMsg: {
-    maxWidth: '75%',
+    maxWidth: "75%",
     backgroundColor: COLORS.surface,
     padding: 16,
     borderRadius: 20,
@@ -254,8 +313,8 @@ const styles = StyleSheet.create({
     lineHeight: 22,
   },
   typingIndicator: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
   },
   typingDot: {
     width: 8,
@@ -271,12 +330,12 @@ const styles = StyleSheet.create({
     opacity: 0.3,
   },
   inputArea: {
-    flexDirection: 'row',
+    flexDirection: "row",
     padding: 16,
     backgroundColor: COLORS.surface,
     borderTopWidth: 1,
     borderTopColor: COLORS.border,
-    alignItems: 'flex-end',
+    alignItems: "flex-end",
   },
   chatInput: {
     flex: 1,
@@ -291,13 +350,13 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 24,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     elevation: 4,
   },
   sendButtonText: {
     color: COLORS.text,
     fontSize: 20,
-    fontWeight: 'bold',
+    fontWeight: "bold",
   },
 });

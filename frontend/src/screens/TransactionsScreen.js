@@ -1,11 +1,17 @@
-import React, { useEffect, useState } from 'react';
-import { View, FlatList, StyleSheet, TouchableOpacity, RefreshControl } from 'react-native';
-import { Text } from 'react-native-paper';
-import Animated, { FadeInRight, Layout } from 'react-native-reanimated';
-import { LinearGradient } from 'expo-linear-gradient';
-import api from '../api/mockApi';
-import TransactionItem from '../components/TransactionItem';
-import { COLORS } from '../theme/colors';
+import React, { useEffect, useState } from "react";
+import {
+  View,
+  FlatList,
+  StyleSheet,
+  TouchableOpacity,
+  RefreshControl,
+} from "react-native";
+import { Text } from "react-native-paper";
+import Animated, { FadeInRight, Layout } from "react-native-reanimated";
+import { LinearGradient } from "expo-linear-gradient";
+import api from "../api/axios";
+import TransactionItem from "../components/TransactionItem";
+import { COLORS } from "../theme/colors";
 
 export default function TransactionsScreen({ navigation }) {
   const [transactions, setTransactions] = useState([]);
@@ -15,12 +21,60 @@ export default function TransactionsScreen({ navigation }) {
     fetchTransactions();
   }, []);
 
+  // const fetchTransactions = async () => {
+  //   // try {
+  //   //   // Try combined transactions endpoint first
+  //   //   try {
+  //   //     const res = await api.get('transactions/');
+  //   //     setTransactions(res.data);
+  //   //     return;
+  //   //   } catch (e) {
+  //   //     // fallback: fetch expenses and income and merge
+  //   //   }
+  //     const [expRes, incRes] = await Promise.allSettled([api.get('expenses/'), api.get('income/')]);
+  //     const list = [];
+  //     if (expRes.status === 'fulfilled') {
+  //       expRes.value.data.forEach(item => list.push({ ...item, category: 'expense' }));
+  //     }
+  //     if (incRes.status === 'fulfilled') {
+  //       incRes.value.data.forEach(item => list.push({ ...item, category: 'income' }));
+  //     }
+  //     // sort by date or created_at (descending)
+  //     list.sort((a,b) => new Date(b.date || b.created_at) - new Date(a.date || a.created_at));
+  //     setTransactions(list);
+  //   } catch (e) {
+  //     // ignore
+  //   }
+  // };
   const fetchTransactions = async () => {
     try {
-      const res = await api.get('transactions/');
-      setTransactions(res.data);
+      const [expRes, incRes] = await Promise.allSettled([
+        api.get("expenses/"),
+        api.get("income/"),
+      ]);
+
+      const list = [];
+
+      if (expRes.status === "fulfilled") {
+        expRes.value.data.forEach((item) =>
+          list.push({ ...item, category: "expense" })
+        );
+      }
+
+      if (incRes.status === "fulfilled") {
+        incRes.value.data.forEach((item) =>
+          list.push({ ...item, category: "income" })
+        );
+      }
+
+      list.sort(
+        (a, b) =>
+          new Date(b.date || b.created_at) - new Date(a.date || a.created_at)
+      );
+
+      setTransactions(list);
     } catch (e) {
-      // ignore demo
+      console.log("Failed to load transactions:", e);
     }
   };
 
@@ -36,9 +90,11 @@ export default function TransactionsScreen({ navigation }) {
       <View style={styles.header}>
         <View>
           <Text style={styles.headerTitle}>Transactions</Text>
-          <Text style={styles.headerSubtitle}>{transactions.length} total entries</Text>
+          <Text style={styles.headerSubtitle}>
+            {transactions.length} total entries
+          </Text>
         </View>
-        <TouchableOpacity onPress={() => navigation.navigate('AddTransaction')}>
+        <TouchableOpacity onPress={() => navigation.navigate("AddTransaction")}>
           <LinearGradient colors={COLORS.gradient2} style={styles.addButton}>
             <Text style={styles.addButtonText}>+</Text>
           </LinearGradient>
@@ -46,7 +102,10 @@ export default function TransactionsScreen({ navigation }) {
       </View>
 
       {/* Filter Tabs */}
-      <Animated.View entering={FadeInRight.delay(100)} style={styles.filterContainer}>
+      <Animated.View
+        entering={FadeInRight.delay(100)}
+        style={styles.filterContainer}
+      >
         <TouchableOpacity style={[styles.filterTab, styles.filterTabActive]}>
           <Text style={styles.filterTabTextActive}>All</Text>
         </TouchableOpacity>
@@ -63,7 +122,10 @@ export default function TransactionsScreen({ navigation }) {
         data={transactions}
         keyExtractor={(item) => String(item.id)}
         renderItem={({ item, index }) => (
-          <Animated.View entering={FadeInRight.delay(index * 50)} layout={Layout.springify()}>
+          <Animated.View
+            entering={FadeInRight.delay(index * 50)}
+            layout={Layout.springify()}
+          >
             <TransactionItem item={item} />
           </Animated.View>
         )}
@@ -80,7 +142,9 @@ export default function TransactionsScreen({ navigation }) {
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
             <Text style={styles.emptyText}>No transactions yet</Text>
-            <Text style={styles.emptySubtext}>Add your first transaction to get started</Text>
+            <Text style={styles.emptySubtext}>
+              Add your first transaction to get started
+            </Text>
           </View>
         }
       />
@@ -94,16 +158,16 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.background,
   },
   header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     padding: 20,
     paddingTop: 60,
   },
   headerTitle: {
     color: COLORS.text,
     fontSize: 32,
-    fontWeight: 'bold',
+    fontWeight: "bold",
   },
   headerSubtitle: {
     color: COLORS.textSecondary,
@@ -114,8 +178,8 @@ const styles = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: 28,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     elevation: 8,
     shadowColor: COLORS.primary,
     shadowOffset: { width: 0, height: 4 },
@@ -125,10 +189,10 @@ const styles = StyleSheet.create({
   addButtonText: {
     color: COLORS.text,
     fontSize: 28,
-    fontWeight: 'bold',
+    fontWeight: "bold",
   },
   filterContainer: {
-    flexDirection: 'row',
+    flexDirection: "row",
     paddingHorizontal: 20,
     marginBottom: 16,
   },
@@ -145,26 +209,26 @@ const styles = StyleSheet.create({
   filterTabText: {
     color: COLORS.textSecondary,
     fontSize: 14,
-    fontWeight: '600',
+    fontWeight: "600",
   },
   filterTabTextActive: {
     color: COLORS.text,
     fontSize: 14,
-    fontWeight: '600',
+    fontWeight: "600",
   },
   listContent: {
     paddingHorizontal: 20,
     paddingBottom: 20,
   },
   emptyContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     paddingVertical: 60,
   },
   emptyText: {
     color: COLORS.text,
     fontSize: 18,
-    fontWeight: '600',
+    fontWeight: "600",
     marginBottom: 8,
   },
   emptySubtext: {

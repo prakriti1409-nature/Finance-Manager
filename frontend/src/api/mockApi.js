@@ -44,7 +44,7 @@ export default {
       return { data: tx };
     }
     // chatbot
-    if (path === 'chatbot/') {
+    if (path === 'chatbot/llm') {
       const question = (body.question || '').toLowerCase();
       const answer = mock.chatbotReplies[question] || mock.chatbotReplies.default;
       return { data: { answer } };

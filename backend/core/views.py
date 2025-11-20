@@ -3,14 +3,16 @@ from rest_framework import generics, permissions
 from django.contrib.auth.models import User
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, AllowAny   # ✅ ADD THIS
 from rest_framework import status
-
-from .models import Transaction, ChatMessage, Category, Budget, Goal
+from django.shortcuts import get_object_or_404
+from .models import ChatMessage
+from .serializers import ChatMessageSerializer
+from .models import Transaction, ChatMessage, Category, Budget, Goal,Expense,Income
 from .serializers import (
     UserSerializer, TransactionSerializer,
     ChatMessageSerializer, CategorySerializer,
-    BudgetSerializer, GoalSerializer
+    BudgetSerializer, GoalSerializer,ExpenseSerializer,IncomeSerializer,UserSerializer, RegisterSerializer
 )
 
 # ML helpers
@@ -25,10 +27,10 @@ from django.http import HttpResponse
 # -------------------------
 # Register
 # -------------------------
-class RegisterView(generics.CreateAPIView):
-    queryset = User.objects.all()
-    serializer_class = UserSerializer
-    permission_classes = [permissions.AllowAny]
+# class RegisterView(generics.CreateAPIView):
+#     queryset = User.objects.all()
+#     serializer_class = UserSerializer
+#     permission_classes = [permissions.AllowAny]
 
 
 # -------------------------
@@ -77,11 +79,20 @@ class FinancialHealthView(APIView):
 
     def get(self, request):
         user = request.user
-        income_total = sum(Transaction.objects.filter(
-            user=user, category="income").values_list("amount", flat=True))
+        print("🔥 ALL USER TRANSACTIONS:", 
+                    list(Transaction.objects.filter(user=user)
+                        .values("id", "category", "amount")))
+        income_total = sum(
+            Transaction.objects.filter(
+                user=user, category__iexact="income"
+            ).values_list("amount", flat=True)
+        )
 
-        expense_total = sum(Transaction.objects.filter(
-            user=user, category="expense").values_list("amount", flat=True))
+        expense_total = sum(
+            Transaction.objects.filter(
+                user=user, category__iexact="expense"
+            ).values_list("amount", flat=True)
+        )
 
         score_data = calculate_financial_score(income_total, expense_total)
         return Response(score_data)
@@ -158,48 +169,57 @@ class ChatbotLLMView(APIView):
 
     def post(self, request):
         user = request.user
-        user_msg = (request.data.get("message") or "").strip()
+        user_msg = request.data.get("message", "").strip()
 
         if not user_msg:
             return Response({"detail": "Message required."}, status=400)
 
-        # Pull API key
-        key = os.environ.get("OPENAI_API_KEY")
-        if not key:
-            return Response({"detail": "OPENAI_API_KEY not set"}, status=503)
+        api_key = os.environ.get("OPENROUTER_API_KEY")
+        if not api_key:
+            return Response({"detail": "OpenRouter API key missing"}, status=503)
 
-        # Build history
-        messages = [{"role": "system", "content": "You are a finance assistant."}]
-        for c in get_last_n_messages(user, n=4):
-            messages.append({"role": "user", "content": c.message})
-            messages.append({"role": "assistant", "content": c.reply})
+        # Build chat history for OpenRouter
+        history = []
+        for c in get_last_n_messages(user, 6):
+            history.append({"role": "user", "content": c.message})
+            history.append({"role": "assistant", "content": c.reply})
 
-        messages.append({"role": "user", "content": user_msg})
+        history.append({"role": "user", "content": user_msg})
 
-        # API call
         try:
+            endpoint = "https://openrouter.ai/api/v1/chat/completions"
+
             resp = requests.post(
-                "https://api.openai.com/v1/chat/completions",
-                headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
-                json={"model": "gpt-3.5-turbo", "messages": messages},
-                timeout=20
+                endpoint,
+                headers={
+                    "Authorization": f"Bearer {api_key}",
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "model": "openai/gpt-4o-mini",  # free/cheap fast model
+                    "messages": history,
+                },
             )
-            resp.raise_for_status()
-            reply = resp.json()["choices"][0]["message"]["content"].strip()
+
+            data = resp.json()
+
+            if "choices" not in data:
+                raise Exception(data.get("error", "Unknown OpenRouter response"))
+
+            reply = data["choices"][0]["message"]["content"]
+
         except Exception as e:
+            print("🔥 ERROR:", str(e))
             return Response({"detail": str(e)}, status=500)
 
-        # Save chat
-        msg_obj = ChatMessage.objects.create(
+        msg = ChatMessage.objects.create(
             user=user,
             message=user_msg,
             reply=reply,
-            source="llm"
+            source="openrouter"
         )
 
-        return Response(ChatMessageSerializer(msg_obj).data, status=200)
-
-
+        return Response(ChatMessageSerializer(msg).data)
 # ---------- CATEGORY ----------
 class CategoryListCreate(APIView):
     permission_classes = [IsAuthenticated]
@@ -265,3 +285,94 @@ class ExportCSVView(APIView):
             writer.writerow([t.date, t.category, t.amount, t.description])
 
         return response
+class ExpenseListCreateView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        expenses = Expense.objects.filter(user=request.user).order_by("-date")
+        serializer = ExpenseSerializer(expenses, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    def post(self, request):
+        serializer = ExpenseSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save(user=request.user)
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class ExpenseDeleteView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def delete(self, request, pk):
+        expense = get_object_or_404(Expense, pk=pk, user=request.user)
+        expense.delete()
+        return Response({"message": "Expense deleted"}, status=status.HTTP_200_OK)
+class GoalListCreateView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        goals = Goal.objects.filter(user=request.user).order_by("deadline")
+        serializer = GoalSerializer(goals, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    def post(self, request):
+        serializer = GoalSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save(user=request.user)
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class GoalDeleteView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def delete(self, request, pk):
+        goal = get_object_or_404(Goal, pk=pk, user=request.user)
+        goal.delete()
+        return Response({"message": "Goal deleted"}, status=status.HTTP_200_OK)
+class IncomeListCreateView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        incomes = Income.objects.filter(user=request.user).order_by("-date")
+        serializer = IncomeSerializer(incomes, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    def post(self, request):
+        serializer = IncomeSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save(user=request.user)
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class IncomeDeleteView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def delete(self, request, pk):
+        income = get_object_or_404(Income, pk=pk, user=request.user)
+        income.delete()
+        return Response({"message": "Income deleted"}, status=status.HTTP_200_OK)
+class RegisterView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        serializer = RegisterSerializer(data=request.data)
+
+        if serializer.is_valid():
+            serializer.save()
+            return Response(
+                {"message": "User registered successfully"},
+                status=status.HTTP_201_CREATED
+            )
+
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class UserProfileView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        serializer = UserSerializer(request.user)
+        return Response(serializer.data, status=status.HTTP_200_OK)
